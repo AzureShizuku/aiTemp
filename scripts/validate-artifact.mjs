@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+const base=new URL('../',import.meta.url);
+const source=await readFile(new URL('dist/server/index.js',base),'utf8');
+const manifest=JSON.parse(await readFile(new URL('dist/.openai/hosting.json',base),'utf8'));
+assert.equal(manifest.project_id,'appgprj_6acc9592d1ac8191bfee7b9493220eec');assert.ok(!manifest.static);
+const mod=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+assert.equal(typeof mod.default.fetch,'function');
+const page=await mod.default.fetch(new Request('https://site.test/'),{});assert.equal(page.status,200);assert.ok((await page.text()).includes('arco-app.js'));
+const api=await mod.default.fetch(new Request('https://site.test/api/recognize'),{});const config=await api.json();assert.equal(config.provider,'qwen');assert.equal(config.configured,false);
+const missing=await mod.default.fetch(new Request('https://site.test/api/recognize',{method:'POST'}),{});assert.equal(missing.status,503);
+const js=await mod.default.fetch(new Request('https://site.test/vendor/pdf.worker.min.mjs'),{});assert.equal(js.status,200);assert.ok(js.headers.get('content-type').includes('javascript'));
+const rejected=await mod.default.fetch(new Request('https://site.test/api/recognize',{method:'POST',headers:{Origin:'https://other.test'}}),{});assert.equal(rejected.status,403);
+console.log('PASS: Worker artifact, mobile assets, PDF module, API routing, missing-key state and origin check');
